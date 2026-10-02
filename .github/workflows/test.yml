@@ -46,6 +46,10 @@ jobs:
           with psycopg.connect("postgresql://eve_user:eve_password@localhost:5432/postgres", autocommit=True) as connection:
               connection.execute("CREATE DATABASE eve_booking_test")
           PY
+      - name: Migrate and seed application database
+        run: |
+          python -m alembic upgrade head
+          python -m app.seed
       - name: Lint
         run: python -m ruff check .
       - name: Test
