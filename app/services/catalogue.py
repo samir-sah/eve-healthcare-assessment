@@ -27,7 +27,9 @@ def create_centre(session: Session, payload: CentreCreate) -> Centre:
 
 def get_centre(session: Session, centre_id: uuid.UUID) -> Centre:
     centre = session.scalar(
-        select(Centre).where(Centre.id == centre_id).options(selectinload(Centre.offerings))
+        select(Centre)
+        .where(Centre.id == centre_id)
+        .options(selectinload(Centre.offerings).selectinload(Offering.diagnostic_test))
     )
     if centre is None:
         raise ApiError(404, "CENTRE_NOT_FOUND", "Centre was not found")

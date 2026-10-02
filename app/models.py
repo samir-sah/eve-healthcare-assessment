@@ -110,6 +110,10 @@ class Offering(Base):
     diagnostic_test: Mapped[DiagnosticTest] = relationship(back_populates="offerings")
     bookings: Mapped[list[Booking]] = relationship(back_populates="offering")
 
+    @property
+    def test_name(self) -> str:
+        return self.diagnostic_test.name
+
 
 class Booking(Base):
     __tablename__ = "bookings"

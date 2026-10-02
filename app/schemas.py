@@ -87,6 +87,10 @@ class OfferingRead(BaseModel):
     is_active: bool
 
 
+class OfferingDetailRead(OfferingRead):
+    test_name: str
+
+
 class CentreRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -95,8 +99,12 @@ class CentreRead(BaseModel):
     location: str
 
 
+class CentreList(BaseModel):
+    items: list[CentreRead]
+
+
 class CentreDetail(CentreRead):
-    offerings: list[OfferingRead]
+    offerings: list[OfferingDetailRead]
 
 
 class DiagnosticTestRead(BaseModel):
@@ -105,6 +113,10 @@ class DiagnosticTestRead(BaseModel):
     id: uuid.UUID
     code: str
     name: str
+
+
+class DiagnosticTestList(BaseModel):
+    items: list[DiagnosticTestRead]
 
 
 class BookingCreate(StrictModel):

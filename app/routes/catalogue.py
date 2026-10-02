@@ -12,9 +12,11 @@ from app.models import Centre, DiagnosticTest, Offering, User
 from app.schemas import (
     CentreCreate,
     CentreDetail,
+    CentreList,
     CentreRead,
     CentreUpdate,
     DiagnosticTestCreate,
+    DiagnosticTestList,
     DiagnosticTestRead,
     OfferingCreate,
     OfferingRead,
@@ -27,9 +29,9 @@ SessionDependency = Annotated[Session, Depends(get_session)]
 StaffDependency = Annotated[User, Depends(get_current_staff)]
 
 
-@router.get("/centres/", response_model=list[CentreRead])
-def list_centres(session: SessionDependency) -> list[Centre]:
-    return catalogue.list_centres(session)
+@router.get("/centres/", response_model=CentreList)
+def list_centres(session: SessionDependency) -> CentreList:
+    return CentreList(items=catalogue.list_centres(session))
 
 
 @router.get("/centres/{centre_id}/", response_model=CentreDetail)
@@ -49,9 +51,9 @@ def patch_centre(
     return catalogue.update_centre(session, centre_id, payload)
 
 
-@router.get("/tests/", response_model=list[DiagnosticTestRead])
-def list_tests(session: SessionDependency) -> list[DiagnosticTest]:
-    return catalogue.list_diagnostic_tests(session)
+@router.get("/tests/", response_model=DiagnosticTestList)
+def list_tests(session: SessionDependency) -> DiagnosticTestList:
+    return DiagnosticTestList(items=catalogue.list_diagnostic_tests(session))
 
 
 @router.post("/tests/", response_model=DiagnosticTestRead, status_code=status.HTTP_201_CREATED)
