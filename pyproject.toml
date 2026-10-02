@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "eve-booking-api"
+version = "0.1.0"
+description = "Diagnostic test bookings with simulated payments and idempotent webhooks"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.13,<2",
+    "email-validator>=2.2,<3",
+    "fastapi>=0.115,<1",
+    "psycopg[binary]>=3.2,<4",
+    "pydantic-settings>=2.6,<3",
+    "PyJWT>=2.9,<3",
+    "pwdlib[argon2]>=0.2,<1",
+    "SQLAlchemy>=2.0,<3",
+    "uvicorn[standard]>=0.30,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "httpx>=0.27,<1",
+    "pytest>=8.3,<9",
+    "pytest-cov>=6,<7",
+    "ruff>=0.8,<1",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
