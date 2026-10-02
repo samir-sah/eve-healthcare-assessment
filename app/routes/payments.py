@@ -2,14 +2,18 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.db import get_session
+from app.errors import ApiError
 from app.models import User
-from app.schemas import PaymentCreate, PaymentRead
+from app.schemas import PaymentCreate, PaymentRead, WebhookPayload, WebhookReceipt
 from app.services.payments import initiate_payment
+from app.services.webhooks import process_webhook
+from app.webhooks import MAX_WEBHOOK_BODY_BYTES, verify_webhook_signature
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 SessionDependency = Annotated[Session, Depends(get_session)]
@@ -27,3 +31,22 @@ def create_payment(
     if payment.replayed:
         response.status_code = status.HTTP_200_OK
     return payment
+
+
+@router.post("/webhook/", response_model=WebhookReceipt)
+async def receive_webhook(request: Request, session: SessionDependency) -> WebhookReceipt:
+    raw_body = await request.body()
+    if len(raw_body) > MAX_WEBHOOK_BODY_BYTES:
+        raise ApiError(413, "PAYLOAD_TOO_LARGE", "Webhook payload is too large")
+
+    verify_webhook_signature(
+        raw_body,
+        request.headers.get("X-Webhook-Timestamp"),
+        request.headers.get("X-Webhook-Signature"),
+    )
+    try:
+        payload = WebhookPayload.model_validate_json(raw_body)
+    except ValidationError:
+        raise ApiError(422, "VALIDATION_ERROR", "Webhook payload is invalid") from None
+
+    return process_webhook(session, payload)

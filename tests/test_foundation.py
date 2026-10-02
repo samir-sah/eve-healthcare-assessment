@@ -44,3 +44,4 @@ def test_openapi_is_available_before_database_configuration() -> None:
     assert "/centres/" in response.json()["paths"]
     assert "/bookings/" in response.json()["paths"]
     assert "/payments/" in response.json()["paths"]
+    assert "/payments/webhook/" in response.json()["paths"]

@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
@@ -146,3 +147,15 @@ class PaymentRead(BaseModel):
     amount: Decimal
     currency: str
     replayed: bool
+
+
+class WebhookPayload(StrictModel):
+    event_id: str = Field(min_length=1, max_length=128)
+    payment_id: uuid.UUID
+    status: Literal["SUCCESS", "FAILED"]
+
+
+class WebhookReceipt(BaseModel):
+    received: bool = True
+    duplicate: bool
+    event_id: str
