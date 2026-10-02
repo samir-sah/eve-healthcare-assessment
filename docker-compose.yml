@@ -1,0 +1,62 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: eve_booking
+      POSTGRES_USER: eve_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-eve_local_password}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eve_user -d eve_booking"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    command: >
+      sh -c "python -m alembic upgrade head && python -m app.seed &&
+      uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    environment: &application_environment
+      DATABASE_URL: postgresql+psycopg://eve_user:${POSTGRES_PASSWORD:-eve_local_password}@db:5432/eve_booking
+      TEST_DATABASE_URL: postgresql+psycopg://eve_user:${POSTGRES_PASSWORD:-eve_local_password}@db:5432/eve_booking_test
+      JWT_SECRET: ${JWT_SECRET:-replace-this-local-jwt-secret-with-32-characters}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-replace-this-local-webhook-secret-with-32-characters}
+      SEED_STAFF_EMAIL: ${SEED_STAFF_EMAIL:-staff@example.com}
+      SEED_STAFF_PASSWORD: ${SEED_STAFF_PASSWORD:-local-password}
+      MOCK_PAYMENT_MODE: ${MOCK_PAYMENT_MODE:-success}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      CACHE_TTL_SECONDS: ${CACHE_TTL_SECONDS:-60}
+      LOGIN_RATE_LIMIT: ${LOGIN_RATE_LIMIT:-5}
+      WEBHOOK_RATE_LIMIT: ${WEBHOOK_RATE_LIMIT:-60}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  worker:
+    build: .
+    command: celery -A app.celery_app.celery_app worker --loglevel=INFO
+    environment: *application_environment
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

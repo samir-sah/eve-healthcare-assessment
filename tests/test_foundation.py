@@ -36,7 +36,7 @@ def test_settings_reject_a_test_database_that_matches_the_application_database()
 
 
 def test_openapi_is_available_before_database_configuration() -> None:
-    response = TestClient(create_app()).get("/openapi.json")
+    response = TestClient(create_app()).get("/openapi.json", headers={"X-Request-ID": "test-id"})
 
     assert response.status_code == 200
     assert response.json()["info"]["title"] == "EVE Healthcare Booking API"
@@ -45,3 +45,4 @@ def test_openapi_is_available_before_database_configuration() -> None:
     assert "/bookings/" in response.json()["paths"]
     assert "/payments/" in response.json()["paths"]
     assert "/payments/webhook/" in response.json()["paths"]
+    assert response.headers["X-Request-ID"] == "test-id"

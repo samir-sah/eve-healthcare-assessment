@@ -34,6 +34,12 @@ class TokenResponse(BaseModel):
     expires_in: int
 
 
+class PaginationMeta(BaseModel):
+    limit: int
+    offset: int
+    total: int
+
+
 class CentreCreate(StrictModel):
     name: str = Field(min_length=1, max_length=120)
     location: str = Field(min_length=1, max_length=255)
@@ -101,6 +107,7 @@ class CentreRead(BaseModel):
 
 class CentreList(BaseModel):
     items: list[CentreRead]
+    pagination: PaginationMeta
 
 
 class CentreDetail(CentreRead):
@@ -117,6 +124,7 @@ class DiagnosticTestRead(BaseModel):
 
 class DiagnosticTestList(BaseModel):
     items: list[DiagnosticTestRead]
+    pagination: PaginationMeta
 
 
 class BookingCreate(StrictModel):
@@ -145,6 +153,7 @@ class BookingRead(BaseModel):
 
 class BookingList(BaseModel):
     items: list[BookingRead]
+    pagination: PaginationMeta
 
 
 class PaymentCreate(StrictModel):
@@ -171,3 +180,4 @@ class WebhookReceipt(BaseModel):
     received: bool = True
     duplicate: bool
     event_id: str
+    queued: bool = False

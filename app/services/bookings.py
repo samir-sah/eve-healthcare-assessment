@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.errors import ApiError
@@ -63,15 +63,23 @@ def create_booking(session: Session, user_id: uuid.UUID, payload: BookingCreate)
     return booking
 
 
-def list_owned_bookings(session: Session, user_id: uuid.UUID) -> list[Booking]:
-    return list(
+def list_owned_bookings(
+    session: Session, user_id: uuid.UUID, limit: int, offset: int
+) -> tuple[list[Booking], int]:
+    bookings = list(
         session.scalars(
             select(Booking)
             .where(Booking.user_id == user_id)
             .options(selectinload(Booking.offering))
             .order_by(Booking.created_at.desc(), Booking.id.desc())
+            .limit(limit)
+            .offset(offset)
         )
     )
+    total = session.scalar(
+        select(func.count()).select_from(Booking).where(Booking.user_id == user_id)
+    ) or 0
+    return bookings, total
 
 
 def cancel_booking(session: Session, user_id: uuid.UUID, booking_id: uuid.UUID) -> Booking:

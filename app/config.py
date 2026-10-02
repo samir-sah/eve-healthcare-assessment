@@ -30,6 +30,18 @@ class Settings(BaseSettings):
     mock_payment_mode: MockPaymentMode = Field(
         default=MockPaymentMode.SUCCESS, validation_alias="MOCK_PAYMENT_MODE"
     )
+    redis_url: str | None = Field(default=None, validation_alias="REDIS_URL")
+    celery_broker_url: str | None = Field(default=None, validation_alias="CELERY_BROKER_URL")
+    celery_result_backend: str | None = Field(
+        default=None, validation_alias="CELERY_RESULT_BACKEND"
+    )
+    cache_ttl_seconds: int = Field(
+        default=60, ge=1, le=3_600, validation_alias="CACHE_TTL_SECONDS"
+    )
+    login_rate_limit: int = Field(default=5, ge=1, le=100, validation_alias="LOGIN_RATE_LIMIT")
+    webhook_rate_limit: int = Field(
+        default=60, ge=1, le=1_000, validation_alias="WEBHOOK_RATE_LIMIT"
+    )
     seed_staff_email: str = Field(validation_alias="SEED_STAFF_EMAIL")
     seed_staff_password: SecretStr = Field(validation_alias="SEED_STAFF_PASSWORD")
 

@@ -87,6 +87,10 @@ def test_auth_catalogue_booking_payment_and_idempotent_webhook(
     )
     assert offering.status_code == 201
 
+    catalogue_page = client.get("/centres/?limit=1&offset=0")
+    assert catalogue_page.status_code == 200
+    assert catalogue_page.json()["pagination"] == {"limit": 1, "offset": 0, "total": 1}
+
     signup = client.post(
         "/auth/signup/",
         json={"email": "candidate@example.com", "password": "candidate-password-123"},
@@ -104,6 +108,10 @@ def test_auth_catalogue_booking_payment_and_idempotent_webhook(
     )
     assert booking.status_code == 201
     assert booking.json()["amount"] == "750.00"
+
+    booking_page = client.get("/bookings/?limit=1", headers=authorization(token))
+    assert booking_page.status_code == 200
+    assert booking_page.json()["pagination"] == {"limit": 1, "offset": 0, "total": 1}
 
     payment = client.post(
         "/payments/", json={"booking_id": booking.json()["id"]}, headers=authorization(token)

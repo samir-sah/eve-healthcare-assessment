@@ -4,6 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, Response, status
 from pydantic import ValidationError
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
@@ -34,7 +35,9 @@ def create_payment(
 
 
 @router.post("/webhook/", response_model=WebhookReceipt)
-async def receive_webhook(request: Request, session: SessionDependency) -> WebhookReceipt:
+async def receive_webhook(
+    request: Request, response: Response, session: SessionDependency
+) -> WebhookReceipt:
     raw_body = await request.body()
     if len(raw_body) > MAX_WEBHOOK_BODY_BYTES:
         raise ApiError(413, "PAYLOAD_TOO_LARGE", "Webhook payload is too large")
@@ -49,4 +52,19 @@ async def receive_webhook(request: Request, session: SessionDependency) -> Webho
     except ValidationError:
         raise ApiError(422, "VALIDATION_ERROR", "Webhook payload is invalid") from None
 
-    return process_webhook(session, payload)
+    try:
+        return process_webhook(session, payload)
+    except OperationalError:
+        session.rollback()
+        try:
+            from app.tasks import retry_webhook_processing
+
+            retry_webhook_processing.delay(payload.model_dump(mode="json"))
+        except Exception:
+            raise ApiError(
+                503,
+                "WEBHOOK_RETRY_UNAVAILABLE",
+                "Webhook processing is temporarily unavailable",
+            ) from None
+        response.status_code = status.HTTP_202_ACCEPTED
+        return WebhookReceipt(duplicate=False, event_id=payload.event_id, queued=True)

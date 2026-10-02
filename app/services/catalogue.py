@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -49,8 +49,12 @@ def update_centre(session: Session, centre_id: uuid.UUID, payload: CentreUpdate)
     return centre
 
 
-def list_centres(session: Session) -> list[Centre]:
-    return list(session.scalars(select(Centre).order_by(Centre.name, Centre.id)))
+def list_centres(session: Session, limit: int, offset: int) -> tuple[list[Centre], int]:
+    centres = list(
+        session.scalars(select(Centre).order_by(Centre.name, Centre.id).limit(limit).offset(offset))
+    )
+    total = session.scalar(select(func.count()).select_from(Centre)) or 0
+    return centres, total
 
 
 def create_diagnostic_test(session: Session, payload: DiagnosticTestCreate) -> DiagnosticTest:
@@ -69,8 +73,14 @@ def create_diagnostic_test(session: Session, payload: DiagnosticTestCreate) -> D
     return diagnostic_test
 
 
-def list_diagnostic_tests(session: Session) -> list[DiagnosticTest]:
-    return list(session.scalars(select(DiagnosticTest).order_by(DiagnosticTest.code)))
+def list_diagnostic_tests(
+    session: Session, limit: int, offset: int
+) -> tuple[list[DiagnosticTest], int]:
+    tests = list(
+        session.scalars(select(DiagnosticTest).order_by(DiagnosticTest.code).limit(limit).offset(offset))
+    )
+    total = session.scalar(select(func.count()).select_from(DiagnosticTest)) or 0
+    return tests, total
 
 
 def create_offering(session: Session, centre_id: uuid.UUID, payload: OfferingCreate) -> Offering:

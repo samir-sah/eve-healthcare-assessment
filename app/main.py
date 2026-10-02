@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 
 from app.db import get_session
 from app.errors import ApiError
+from app.observability import RequestLoggingMiddleware, configure_logging
+from app.rate_limit import RateLimitMiddleware
 from app.routes import auth, bookings, catalogue, payments
 
 SessionDependency = Annotated[Session, Depends(get_session)]
@@ -26,11 +28,14 @@ def error_response(
 
 
 def create_app() -> FastAPI:
+    configure_logging()
     app = FastAPI(
         title="EVE Healthcare Booking API",
         version="0.1.0",
         description="Diagnostic-test booking service with simulated payments.",
     )
+    app.add_middleware(RateLimitMiddleware)
+    app.add_middleware(RequestLoggingMiddleware)
 
     @app.exception_handler(ApiError)
     async def api_error_handler(_: Request, exc: ApiError) -> JSONResponse:

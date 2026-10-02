@@ -3,13 +3,13 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.db import get_session
 from app.models import User
-from app.schemas import BookingCreate, BookingList, BookingRead
+from app.schemas import BookingCreate, BookingList, BookingRead, PaginationMeta
 from app.services import bookings
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
@@ -25,12 +25,21 @@ def create_booking(
 
 
 @router.get("/", response_model=BookingList)
-def list_bookings(session: SessionDependency, current_user: UserDependency) -> BookingList:
+def list_bookings(
+    session: SessionDependency,
+    current_user: UserDependency,
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+) -> BookingList:
+    booking_page, total = bookings.list_owned_bookings(
+        session, current_user.id, limit, offset
+    )
     return BookingList(
         items=[
             bookings.serialize_booking(booking)
-            for booking in bookings.list_owned_bookings(session, current_user.id)
-        ]
+            for booking in booking_page
+        ],
+        pagination=PaginationMeta(limit=limit, offset=offset, total=total),
     )
 
 
