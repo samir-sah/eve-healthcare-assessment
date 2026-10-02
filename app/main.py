@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_session
 from app.errors import ApiError
-from app.routes import auth, catalogue
+from app.routes import auth, bookings, catalogue, payments
 
 SessionDependency = Annotated[Session, Depends(get_session)]
 
@@ -59,6 +59,8 @@ def create_app() -> FastAPI:
 
     app.include_router(auth.router)
     app.include_router(catalogue.router)
+    app.include_router(bookings.router)
+    app.include_router(payments.router)
 
     return app
 

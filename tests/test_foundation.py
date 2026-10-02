@@ -42,3 +42,5 @@ def test_openapi_is_available_before_database_configuration() -> None:
     assert response.json()["info"]["title"] == "EVE Healthcare Booking API"
     assert "/auth/signup/" in response.json()["paths"]
     assert "/centres/" in response.json()["paths"]
+    assert "/bookings/" in response.json()["paths"]
+    assert "/payments/" in response.json()["paths"]

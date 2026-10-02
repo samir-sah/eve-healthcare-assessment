@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
@@ -103,3 +104,45 @@ class DiagnosticTestRead(BaseModel):
     id: uuid.UUID
     code: str
     name: str
+
+
+class BookingCreate(StrictModel):
+    offering_id: uuid.UUID
+    appointment_at: datetime
+
+    @field_validator("appointment_at")
+    @classmethod
+    def require_aware_appointment(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("must include a UTC offset")
+        return value.astimezone(UTC)
+
+
+class BookingRead(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    offering_id: uuid.UUID
+    centre_id: uuid.UUID
+    test_id: uuid.UUID
+    appointment_at: datetime
+    amount: Decimal
+    currency: str
+    status: str
+
+
+class BookingList(BaseModel):
+    items: list[BookingRead]
+
+
+class PaymentCreate(StrictModel):
+    booking_id: uuid.UUID
+
+
+class PaymentRead(BaseModel):
+    id: uuid.UUID
+    booking_id: uuid.UUID
+    status: str
+    booking_status: str
+    amount: Decimal
+    currency: str
+    replayed: bool
