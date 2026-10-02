@@ -5,13 +5,30 @@ import hmac
 import json
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime
+from threading import Barrier
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth import create_access_token, hash_password
-from app.models import User
+from app.models import (
+    Booking,
+    BookingStatus,
+    Centre,
+    DiagnosticTest,
+    Offering,
+    Payment,
+    PaymentStatus,
+    User,
+    WebhookEvent,
+)
+from app.schemas import WebhookPayload
+from app.services.payments import initiate_payment
+from app.services.webhooks import process_webhook
 
 pytestmark = pytest.mark.postgres
 
@@ -125,3 +142,95 @@ def test_other_user_cannot_read_an_owned_booking(client: TestClient, postgres_en
     response = client.get(f"/bookings/{uuid.uuid4()}/", headers=authorization(token))
 
     assert response.status_code == 404
+
+
+def create_pending_booking(postgres_engine) -> tuple[uuid.UUID, uuid.UUID]:
+    session = Session(postgres_engine)
+    user = User(
+        email=f"user-{uuid.uuid4()}@example.com", password_hash=hash_password("user-password-123")
+    )
+    centre = Centre(name=f"Centre {uuid.uuid4()}", location="Koramangala")
+    diagnostic_test = DiagnosticTest(code=f"TEST_{uuid.uuid4().hex[:12].upper()}", name="Test")
+    session.add_all([user, centre, diagnostic_test])
+    session.flush()
+    offering = Offering(centre_id=centre.id, test_id=diagnostic_test.id, price="750.00")
+    session.add(offering)
+    session.flush()
+    booking = Booking(
+        user_id=user.id,
+        offering_id=offering.id,
+        appointment_at=datetime(2030, 1, 15, 9, 30, tzinfo=UTC),
+        amount="750.00",
+        currency="INR",
+        status=BookingStatus.PENDING,
+    )
+    session.add(booking)
+    session.commit()
+    user_id, booking_id = user.id, booking.id
+    session.close()
+    return user_id, booking_id
+
+
+def test_concurrent_payment_initiation_creates_one_payment(postgres_engine) -> None:
+    user_id, booking_id = create_pending_booking(postgres_engine)
+    barrier = Barrier(2)
+
+    def initiate() -> tuple[str, bool]:
+        with Session(postgres_engine) as session:
+            barrier.wait(timeout=5)
+            result = initiate_payment(session, user_id, booking_id)
+            return str(result.id), result.replayed
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = [
+            future.result(timeout=10) for future in [pool.submit(initiate), pool.submit(initiate)]
+        ]
+
+    session = Session(postgres_engine)
+    count = session.scalar(
+        select(func.count()).select_from(Payment).where(Payment.booking_id == booking_id)
+    )
+    booking = session.get(Booking, booking_id)
+    session.close()
+
+    assert {result[0] for result in results} and len({result[0] for result in results}) == 1
+    assert sorted(result[1] for result in results) == [False, True]
+    assert count == 1
+    assert booking.status == BookingStatus.CONFIRMED
+
+
+def test_concurrent_identical_webhooks_create_one_receipt(postgres_engine) -> None:
+    _, booking_id = create_pending_booking(postgres_engine)
+    session = Session(postgres_engine)
+    payment = Payment(booking_id=booking_id, provider="mock", status=PaymentStatus.PENDING)
+    session.add(payment)
+    session.commit()
+    payment_id = payment.id
+    session.close()
+    payload = WebhookPayload(event_id="evt-concurrent-001", payment_id=payment_id, status="SUCCESS")
+    barrier = Barrier(2)
+
+    def deliver() -> bool:
+        with Session(postgres_engine) as worker_session:
+            barrier.wait(timeout=5)
+            return process_webhook(worker_session, payload).duplicate
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = [
+            future.result(timeout=10) for future in [pool.submit(deliver), pool.submit(deliver)]
+        ]
+
+    session = Session(postgres_engine)
+    event_count = session.scalar(
+        select(func.count())
+        .select_from(WebhookEvent)
+        .where(WebhookEvent.provider == "mock", WebhookEvent.event_id == payload.event_id)
+    )
+    booking = session.get(Booking, booking_id)
+    persisted_payment = session.get(Payment, payment_id)
+    session.close()
+
+    assert sorted(results) == [False, True]
+    assert event_count == 1
+    assert booking.status == BookingStatus.CONFIRMED
+    assert persisted_payment.status == PaymentStatus.SUCCESS

@@ -15,10 +15,9 @@ correctness and maintainability over infrastructure breadth.
 - PostgreSQL schema/migration for users, centres, tests, offerings, bookings, payments, and webhook
   events.
 
-The local unit suite currently has 14 passing checks for schema configuration, validation, password
-hashing, token claims, state transitions, signatures, and webhook fingerprinting. PostgreSQL-backed
-integration/concurrency tests still need to be run against a local database; they are not claimed as
-complete here.
+The local suite has 14 passing non-database checks; PostgreSQL integration tests are skipped locally
+when `RUN_POSTGRES_TESTS` is absent. GitHub Actions provisions PostgreSQL, migrates, seeds, and runs
+the full suite successfully, including API flow and concurrent payment/webhook tests.
 
 ## Stack
 
