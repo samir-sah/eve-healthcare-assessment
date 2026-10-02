@@ -20,7 +20,7 @@ preserving the assessment's booking and payment invariants.
 - JSON request logs with correlation IDs, Celery retry handling for transient webhook database errors,
   and a Docker Compose API/worker/PostgreSQL/Redis stack.
 
-The local suite has 14 passing non-database checks; PostgreSQL integration tests are skipped locally
+The local suite has 16 passing non-database checks; PostgreSQL integration tests are skipped locally
 when `RUN_POSTGRES_TESTS` is absent. GitHub Actions provisions PostgreSQL, migrates, seeds, and runs
 the full suite successfully, including API flow and concurrent payment/webhook tests.
 
@@ -117,6 +117,37 @@ Write routes require `Authorization: Bearer <token>`, except the webhook. Bookin
 `offering_id` and an offset-aware future `appointment_at`; owner, amount, currency, and state are
 derived by the server.
 
+## Example API flow
+
+After completing the local setup and seed, this PowerShell sequence creates an account, logs in,
+uses the first seeded offering, creates a booking, and simulates its payment:
+
+```powershell
+$api = "http://127.0.0.1:8000"
+$email = "demo-$([guid]::NewGuid().ToString('N').Substring(0, 8))@example.com"
+$password = "demo-password-123"
+
+Invoke-RestMethod -Method Post -Uri "$api/auth/signup/" -ContentType "application/json" `
+  -Body (@{ email = $email; password = $password } | ConvertTo-Json)
+$login = Invoke-RestMethod -Method Post -Uri "$api/auth/login/" -ContentType "application/json" `
+  -Body (@{ email = $email; password = $password } | ConvertTo-Json)
+$headers = @{ Authorization = "Bearer $($login.access_token)" }
+
+$centre = (Invoke-RestMethod -Uri "$api/centres/?limit=1").items[0]
+$offering = (Invoke-RestMethod -Uri "$api/centres/$($centre.id)/").offerings[0]
+$appointment = (Get-Date).ToUniversalTime().AddDays(7).ToString("o")
+$booking = Invoke-RestMethod -Method Post -Uri "$api/bookings/" -Headers $headers `
+  -ContentType "application/json" -Body (@{
+    offering_id = $offering.id
+    appointment_at = $appointment
+  } | ConvertTo-Json)
+$payment = Invoke-RestMethod -Method Post -Uri "$api/payments/" -Headers $headers `
+  -ContentType "application/json" -Body (@{ booking_id = $booking.id } | ConvertTo-Json)
+```
+
+`$payment.status` is `SUCCESS` or `FAILED` according to `MOCK_PAYMENT_MODE`. The interactive
+OpenAPI documentation at `/docs` provides request/response schemas and examples for every route.
+
 ## Payment and webhook behaviour
 
 A booking starts `PENDING`. The mock endpoint uses `MOCK_PAYMENT_MODE=success`, `failure`, or
@@ -148,6 +179,22 @@ currency at creation, so later catalogue price changes never alter historical bo
 INR, treats the authenticated user as the patient, accepts any future offset-aware appointment, and
 allows cancellation only before a payment exists.
 
+The schema has seven focused tables: `users` stores account and staff status; `centres`, `tests`, and
+`offerings` form the public catalogue; `bookings` stores the immutable commercial snapshot and state;
+`payments` enforces one mock payment per booking; and `webhook_events` stores the unique provider
+event and semantic payload fingerprint used for idempotency. Foreign keys model ownership and catalogue
+relationships, while database unique/check constraints protect the key invariants independently of API
+validation.
+
 The scope deliberately excludes slot capacity, patient dependents, refunds, multiple payment
 attempts, real payment gateways, and refresh tokens. Retry handling is limited to transient webhook
 processing failures: it does not create a second payment attempt or change the payment state model.
+
+## Future improvements
+
+- Add centre capacity, slots, time-zone-aware availability, and appointment rescheduling.
+- Introduce a real payment-provider adapter, payment attempts/refunds, and reconciliation tooling.
+- Add refresh-token rotation, email verification, stronger staff administration, and audit trails.
+- Use a shared Redis cluster and durable task monitoring/alerting in a production deployment.
+- Add load, security, and end-to-end container tests; publish versioned API documentation and deploy
+  through a managed CI/CD environment.
