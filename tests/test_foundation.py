@@ -21,8 +21,8 @@ def test_settings_reject_a_test_database_that_matches_the_application_database()
     values = {
         "DATABASE_URL": "postgresql+psycopg://user:password@localhost/eve_booking",
         "TEST_DATABASE_URL": "postgresql+psycopg://user:password@localhost/eve_booking",
-        "JWT_SECRET": "jwt-secret",
-        "WEBHOOK_SECRET": "webhook-secret",
+        "JWT_SECRET": "jwt-secret-that-is-at-least-32-characters",
+        "WEBHOOK_SECRET": "webhook-secret-that-is-at-least-32-characters",
         "SEED_STAFF_EMAIL": "staff@example.com",
         "SEED_STAFF_PASSWORD": "local-password",
     }
@@ -40,3 +40,5 @@ def test_openapi_is_available_before_database_configuration() -> None:
 
     assert response.status_code == 200
     assert response.json()["info"]["title"] == "EVE Healthcare Booking API"
+    assert "/auth/signup/" in response.json()["paths"]
+    assert "/centres/" in response.json()["paths"]

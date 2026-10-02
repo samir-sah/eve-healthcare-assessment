@@ -40,6 +40,13 @@ class Settings(BaseSettings):
             raise ValueError("must use a PostgreSQL SQLAlchemy URL")
         return value
 
+    @field_validator("jwt_secret", "webhook_secret")
+    @classmethod
+    def require_strong_secret(cls, value: SecretStr) -> SecretStr:
+        if len(value.get_secret_value()) < 32:
+            raise ValueError("must be at least 32 characters long")
+        return value
+
     @field_validator("test_database_url")
     @classmethod
     def require_separate_test_database(cls, value: str, info) -> str:

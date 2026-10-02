@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_session
 from app.errors import ApiError
+from app.routes import auth, catalogue
 
 SessionDependency = Annotated[Session, Depends(get_session)]
 
@@ -49,12 +50,15 @@ def create_app() -> FastAPI:
         return error_response(422, "VALIDATION_ERROR", "Request validation failed", details)
 
     @app.get("/health/", tags=["health"])
-    def health_check(session: SessionDependency) -> dict[str, str] | JSONResponse:
+    def health_check(session: SessionDependency) -> dict[str, str]:
         try:
             session.execute(text("SELECT 1"))
         except SQLAlchemyError:
             return error_response(503, "DATABASE_UNAVAILABLE", "Database is unavailable")
         return {"status": "ok"}
+
+    app.include_router(auth.router)
+    app.include_router(catalogue.router)
 
     return app
 
