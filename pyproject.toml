@@ -33,6 +33,7 @@ include = ["app*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+markers = ["postgres: requires RUN_POSTGRES_TESTS=1 and an isolated PostgreSQL test database"]
 
 [tool.ruff]
 target-version = "py312"
